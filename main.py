@@ -11,24 +11,35 @@ class Value():
     def __repr__(self):
         return f"Value(data={self.value})"
     def __add__(self,other):
+        other = other if isinstance(other, Value) else Value(other)
         out = Value(self.value + other.value, (self, other), '+')
         def _backward():
-            self.grad = 1.0 * out.grad
-            other.grad = 1.0 * out.grad
+            self.grad += 1.0 * out.grad
+            other.grad += 1.0 * out.grad
         out._backward = _backward
         return out
-
+    def __neg__(self):
+        return self * -1
+    def __sub__(self,other):
+        other = other if isinstance(other, Value) else Value(other)
+        return self + (-other)
+    # handles reversed multiplication
+    def __radd__(self,other):
+        return self + other
+    def __rmul__(self,other):
+        return self * other
     def __mul__(self,other):
+        other = other if isinstance(other, Value) else Value(other)
         out = Value(self.value * other.value, (self, other), '*')
         def _backward():
-            self.grad = other.value * out.grad
-            other.grad = self.value * out.grad
+            self.grad += other.value * out.grad
+            other.grad += self.value * out.grad
         out._backward = _backward
         return out
-    def __sub__(self,other):
-        return Value(self.value - other.value, (self, other), '-')
     def __truediv__(self,other):
-        return Value(self.value / other.value, (self, other), '/')
+        return self * other**-1
+    def __rtruediv__(self,other):
+        return other * self**-1
     def __floordiv__(self,other):
         return Value(self.value // other.value, (self, other), '//')
     def tanh(self):
@@ -42,7 +53,22 @@ class Value():
         out = Value(value=t, _children=(self,), _op='tanh')
         def _backward():
             #this is because local derivative of tanh function is (1-tanh^2)
-            self.grad = (1-t**2) * out.grad
+            self.grad += (1-t**2) * out.grad
+        out._backward = _backward
+        return out
+    def exp(self):
+        x = self.value
+        out = Value(value=math.exp(x), _children=(self,), _op='exp')
+        def _backward():
+            self.grad += out.value * out.grad
+        return out
+    def __pow__(self,other):
+        assert isinstance(other, (int, float))
+        other = other if isinstance(other, Value) else Value(other)
+        x = self.value
+        out = Value(value=math.pow(x, 2), _children=(self,), _op='pow')
+        def _backward():
+            self.grad += (other * self.value ** (other-1)) * out.grad
         out._backward = _backward
         return out
     def backward(self):
