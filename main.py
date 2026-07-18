@@ -61,12 +61,13 @@ class Value():
         out = Value(value=math.exp(x), _children=(self,), _op='exp')
         def _backward():
             self.grad += out.value * out.grad
+        out._backward = _backward
         return out
     def __pow__(self,other):
         assert isinstance(other, (int, float))
         other = other if isinstance(other, Value) else Value(other)
         x = self.value
-        out = Value(value=math.pow(x, 2), _children=(self,), _op='pow')
+        out = Value(value=self.value**other, _children=(self,), _op='pow')
         def _backward():
             self.grad += (other * self.value ** (other-1)) * out.grad
         out._backward = _backward
