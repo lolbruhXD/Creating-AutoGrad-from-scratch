@@ -1,4 +1,9 @@
+import torch
+import random
 import math
+
+
+
 class Value():
     def __init__(self, value, _children=(), _op='', _label=''):
         self.value = value
@@ -89,34 +94,16 @@ class Value():
         #printing grads
         for node in topo:
             print(node[1].grad)
-a = Value(0.5, _label='a')
-b = Value(0.4, _label='b')
-c = Value(0.2, _label='c')
-d = Value(0.3, _label='d')
-e = a*a
-# e._label = 'e'
-# f = c+d
-# f._label = 'f'
-# g = e*f
-# g._label = 'g'
-# i = g.tanh()
-"""
-ANYTHING BELOW THIS IS UNNECESSARY NOW SINCE WE ARE DOING BACKPROPAGATION VIA THE INTERNAL FUNCTION backward()
-"""
-# print('A =', a)
-# print('B =', b)
-# print('C =', c)
-# print('D =', d)
-# print('A*B =', e)
-# print('C+D =', f)
-# print('(A*B) * (C+D) =', g)
-# print('tanh{(A*B) * (C+D)} =', i)
-# i.grad = 1.0
-# i._backward()
-# g._backward()
-# print(g.grad)
-"""
-ANYTHING ABOVE THIS IS UNNECESSARY NOW SINCE WE ARE DOING BACKPROPAGATION AUTOMATICLALY VIA THE INTERNAL FUNCTION backward()
-"""
-e.backward()
 
+
+
+class Neuron:
+    def __init__(self, input_neurons):
+        # setting w as a list of random
+        self.w = [Value(random.uniform(-1,1)) for _ in range(input_neurons)]
+        self.b = Value(random.uniform(-1,1))
+
+    def __call__(self, x):
+        act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
+        out = act.tanh()
+        return out
