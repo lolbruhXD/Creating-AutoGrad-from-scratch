@@ -1,7 +1,39 @@
 import torch
 import random
 import math
+from graphviz import Digraph
 
+def trace(root):
+    # builds a set of all nodes and edges in a graph
+    nodes, edges = set(), set()
+    def build(v):
+        if v not in nodes:
+            nodes.add(v)
+            for child in v._prev:
+                edges.add((child, v))
+                build(child)
+    build(root)
+    return nodes, edges
+
+def draw_dot(root, format='svg', rankdir='LR'):
+    """
+    format: png | svg | ...
+    rankdir: TB (top to bottom graph) | LR (left to right)
+    """
+    assert rankdir in ['LR', 'TB']
+    nodes, edges = trace(root)
+    dot = Digraph(format=format, graph_attr={'rankdir': rankdir})
+
+    for n in nodes:
+        dot.node(name=str(id(n)), label="{ %s | data %.4f | grad %.4f }" % (n._label, n.value, n.grad), shape='record')
+        if n._op:
+            dot.node(name=str(id(n)) + n._op, label=n._op)
+            dot.edge(str(id(n)) + n._op, str(id(n)))
+
+    for n1, n2 in edges:
+        dot.edge(str(id(n1)), str(id(n2)) + n2._op)
+
+    return dot
 
 
 class Value():
@@ -95,15 +127,35 @@ class Value():
         for node in topo:
             print(node[1].grad)
 
-
-
 class Neuron:
     def __init__(self, input_neurons):
-        # setting w as a list of random
+        # setting w as a list of random weights for the neuron
         self.w = [Value(random.uniform(-1,1)) for _ in range(input_neurons)]
+        # b is just that exact neuron's bias
         self.b = Value(random.uniform(-1,1))
-
+        # call attribute ensures that when this class is called, the neuron's output data is
+        # generated through a sum of the products of its weights and bias and then
+        # and then its passed through a squashing function tanh
     def __call__(self, x):
+        # this is essentially (weights * x) + bias where x is the input data from the previous neuron/s
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
         out = act.tanh()
         return out
+
+class Layer:
+    def __init__(self, input_neurons, output_neurons):
+        # creating a list of neurons in the layer by creating
+        # x number of input neurons and
+        self.neurons = [Neuron(input_neurons) for _ in range(output_neurons)]
+
+    def __call__(self, x):
+        outs = [neuron(x) for neuron in self.neurons]
+        return outs
+class MLP:
+    def __init__(self, nin, nouts):
+        sz = [nin] + nouts
+        self.layers = [Layer(sz[i], sz[i+1]) for i in range(len(nouts))]
+    def __call__(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
