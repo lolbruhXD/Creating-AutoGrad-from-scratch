@@ -1,10 +1,9 @@
-import torch
+
 import random
 import math
 from graphviz import Digraph
 
 def trace(root):
-    # builds a set of all nodes and edges in a graph
     nodes, edges = set(), set()
     def build(v):
         if v not in nodes:
@@ -60,7 +59,6 @@ class Value():
     def __sub__(self,other):
         other = other if isinstance(other, Value) else Value(other)
         return self + (-other)
-    # handles reversed multiplication
     def __radd__(self,other):
         return self + other
     def __rmul__(self,other):
@@ -81,7 +79,6 @@ class Value():
         return Value(self.value // other.value, (self, other), '//')
     def tanh(self):
         x = self.value
-        # If x is large and positive, e^(-2x) approaches 0, which is perfectly stable
         if x >= 0:
             t = (1 - math.exp(-2 * x)) / (1 + math.exp(-2 * x))
         else:
@@ -89,7 +86,6 @@ class Value():
 
         out = Value(value=t, _children=(self,), _op='tanh')
         def _backward():
-            #this is because local derivative of tanh function is (1-tanh^2)
             self.grad += (1-t**2) * out.grad
         out._backward = _backward
         return out
@@ -123,34 +119,30 @@ class Value():
         self.grad = 1.0
         for node in reversed(topo):
             node[1]._backward()
-        #printing grads
         for node in topo:
             print(node[1].grad)
 
 class Neuron:
     def __init__(self, input_neurons):
-        # setting w as a list of random weights for the neuron
         self.w = [Value(random.uniform(-1,1)) for _ in range(input_neurons)]
-        # b is just that exact neuron's bias
         self.b = Value(random.uniform(-1,1))
-        # call attribute ensures that when this class is called, the neuron's output data is
-        # generated through a sum of the products of its weights and bias and then
-        # and then its passed through a squashing function tanh
     def __call__(self, x):
-        # this is essentially (weights * x) + bias where x is the input data from the previous neuron/s
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
         out = act.tanh()
         return out
+    def parameters(self):
+        return self.w + [self.b]
+        
 
 class Layer:
     def __init__(self, input_neurons, output_neurons):
-        # creating a list of neurons in the layer by creating
-        # x number of input neurons and
         self.neurons = [Neuron(input_neurons) for _ in range(output_neurons)]
 
     def __call__(self, x):
         outs = [neuron(x) for neuron in self.neurons]
         return outs
+    def parameters(self):
+        return [p for neuron in self.neurons for p in neuron.parameters()]
 class MLP:
     def __init__(self, nin, nouts):
         sz = [nin] + nouts
@@ -159,3 +151,35 @@ class MLP:
         for layer in self.layers:
             x = layer(x)
         return x
+    def parameters(self):
+        return [p for layer in self.layers for p in layer.parameters()]
+    
+
+xs = [
+    [2.0, 3.0, -1.0],
+    [3.0, -1.0, 0.5],
+    [0.5, 1.0, 1.0],
+    [1.0, 1.0, -1.0],
+]
+ys = [1.0, -1.0, -1.0, 1.0]
+
+n = MLP(3, [4, 4, 1])
+
+epochs = 500
+learning_rate = 0.05
+
+for k in range(epochs):
+    ypred = [n(x)[0] for x in xs]
+    
+    loss = sum((yout - ygt)**2 for ygt, yout in zip(ys, ypred))
+    
+    for p in n.parameters():
+        p.grad = 0.0
+        
+    loss.backward()
+    
+    for p in n.parameters():
+        p.value += -learning_rate * p.grad
+        
+    if k % 50 == 0:
+        print(f"Epoch {k} | Loss: {loss.value:.4f}")
